@@ -1,85 +1,88 @@
 (function () {
     /*
      * @AndreyURL54 для https://t.me/lampa_plugins_uncensored/120480
-     * Ручная очистка истории через кнопку в настройках Lampa.
-     * Избранное не трогает.
+     * Плагин добавляет боковое меню в настройках Lampa.
+     * Ничего не удаляет при подключении.
      */
 
     'use strict';
 
-    var pluginId = 'manual_clear_history_button';
+    var pluginId = 'clear_history_favorite_menu';
 
     if (window[pluginId]) return;
     window[pluginId] = true;
 
-    function emptyLikeCurrent(value) {
-        if (Array.isArray(value)) return [];
+    function notify(text) {
+        if (Lampa.Noty) Lampa.Noty.show(text);
+    }
 
-        if (value && typeof value == 'object') {
-            Object.keys(value).forEach(function (key) {
-                if (Array.isArray(value[key])) value[key] = [];
-                else if (value[key] && typeof value[key] == 'object') value[key] = {};
-                else delete value[key];
-            });
+    function clearFavorite() {
+        var fav = Lampa.Storage.get('favorite', {});
 
-            return value;
-        }
+        Object.keys(fav).forEach(function (key) {
+            if (Array.isArray(fav[key])) fav[key] = [];
+            else if (fav[key] && typeof fav[key] == 'object') fav[key] = {};
+            else delete fav[key];
+        });
 
-        return [];
+        Lampa.Storage.set('favorite', fav);
     }
 
     function clearHistory() {
-        var history = Lampa.Storage.get('history', []);
+        var history = Lampa.Storage.get('history', {});
 
-        Lampa.Storage.set('history', emptyLikeCurrent(history));
-
-        if (Lampa.Noty) Lampa.Noty.show('История очищена');
-    }
-
-    function askClearHistory() {
-        if (Lampa.Modal) {
-            Lampa.Modal.open({
-                title: 'Очистить историю',
-                html: $('<div class="about">Удалить всю историю на этом устройстве?</div>'),
-                size: 'small',
-                buttons: [
-                    {
-                        name: 'Отмена',
-                        onSelect: function () {
-                            Lampa.Modal.close();
-                        }
-                    },
-                    {
-                        name: 'Очистить',
-                        onSelect: function () {
-                            clearHistory();
-                            Lampa.Modal.close();
-                        }
-                    }
-                ]
+        if (Array.isArray(history)) history = [];
+        else if (history && typeof history == 'object') {
+            Object.keys(history).forEach(function (key) {
+                if (Array.isArray(history[key])) history[key] = [];
+                else if (history[key] && typeof history[key] == 'object') history[key] = {};
+                else delete history[key];
             });
-        } else if (window.confirm('Удалить всю историю на этом устройстве?')) {
-            clearHistory();
-        }
+        } else history = {};
+
+        Lampa.Storage.set('history', history);
     }
 
-    function addSettingsButton() {
+    function clearAll() {
+        clearHistory();
+        clearFavorite();
+        notify('История и избранное очищены');
+    }
+
+    function createSettings() {
+        if (!Lampa.SettingsApi) return;
+
+        Lampa.SettingsApi.addComponent({
+            component: pluginId,
+            name: 'Очистка',
+            icon: '<svg height="260" viewBox="0 0 244 260" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M40 78h164v156c0 14-12 26-26 26H66c-14 0-26-12-26-26V78zm38-48h88l12 22h52v26H14V52h52l12-22zm18 82v102h20V112H96zm48 0v102h20V112h-20z" fill="white"/></svg>'
+        });
+
         Lampa.SettingsApi.addParam({
-            component: 'account',
+            component: pluginId,
             param: {
                 type: 'button',
-                component: pluginId,
-                name: 'Очистить историю',
-                description: 'Удаляет историю просмотров. Избранное не изменяется.'
+                component: pluginId + '_clear',
+                name: 'Отчистить историю и избранное'
             },
-            onChange: askClearHistory
+            onChange: clearAll
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: pluginId,
+            param: {
+                type: 'button',
+                component: pluginId + '_no',
+                name: 'Нет'
+            },
+            onChange: function () {
+                notify('Отменено');
+            }
         });
     }
 
     function start() {
-        if (!Lampa.SettingsApi) return;
-
-        addSettingsButton();
+        createSettings();
     }
 
     if (window.appready) start();
